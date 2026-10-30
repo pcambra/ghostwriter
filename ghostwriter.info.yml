@@ -1,0 +1,8 @@
+name: Ghostwriter
+type: module
+description: 'Unofficial Blood on the Clocktower Storyteller knowledge base served over MCP. Community-created, not affiliated with The Pandemonium Institute.'
+package: Ghostwriter
+core_version_requirement: ^11.3
+dependencies:
+  - mcp_server:mcp_server
+configure: ghostwriter.refresh

@@ -1,0 +1,52 @@
+<?php
+
+/**
+ * @file
+ * Install and uninstall functions for the Ghostwriter module.
+ */
+
+declare(strict_types=1);
+
+use Drupal\ghostwriter\Sync\DataSync;
+
+/**
+ * Implements hook_install().
+ */
+function ghostwriter_install(bool $is_syncing): void {
+  foreach (_ghostwriter_resource_plugins() as $config_name => $plugin_id) {
+    $config = \Drupal::configFactory()->getEditable($config_name);
+    $plugins = $config->get('plugins') ?? [];
+    if (!in_array($plugin_id, array_column($plugins, 'id'), TRUE)) {
+      $plugins[] = ['id' => $plugin_id, 'enabled' => TRUE, 'configuration' => []];
+      $config->set('plugins', $plugins)->save();
+    }
+  }
+  \Drupal::service('ghostwriter.sync')->sync();
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function ghostwriter_uninstall(bool $is_syncing): void {
+  foreach (_ghostwriter_resource_plugins() as $config_name => $plugin_id) {
+    $config = \Drupal::configFactory()->getEditable($config_name);
+    $plugins = array_filter($config->get('plugins') ?? [], fn(array $plugin): bool => $plugin['id'] !== $plugin_id);
+    $config->set('plugins', array_values($plugins))->save();
+  }
+  $keys = ['ghostwriter.fetched_at', 'ghostwriter.source'];
+  foreach (DataSync::FILES as $file) {
+    array_push($keys, "ghostwriter.sha256.$file", "ghostwriter.etag.$file", "ghostwriter.last_modified.$file");
+  }
+  \Drupal::state()->deleteMultiple($keys);
+  \Drupal::service('file_system')->deleteRecursive(DataSync::DIR);
+}
+
+/**
+ * Resource plugin ids Ghostwriter registers, keyed by mcp_server config name.
+ */
+function _ghostwriter_resource_plugins(): array {
+  return [
+    'mcp_server.resource_template_providers' => 'ghostwriter_resources',
+    'mcp_server.resource_providers' => 'ghostwriter_status',
+  ];
+}

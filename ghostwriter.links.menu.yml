@@ -1,0 +1,5 @@
+ghostwriter.refresh:
+  title: 'Ghostwriter data'
+  description: 'See when the official Blood on the Clocktower data was fetched, and refresh it.'
+  route_name: ghostwriter.refresh
+  parent: system.admin_config_services

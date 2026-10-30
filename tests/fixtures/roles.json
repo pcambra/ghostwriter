@@ -1,0 +1,67 @@
+[
+  {
+    "id": "lamplighter",
+    "name": "Lamplighter",
+    "team": "townsfolk",
+    "edition": "gw",
+    "ability": "Each night, you learn whether a lamp is lit.",
+    "setup": false,
+    "reminders": ["Lit"],
+    "firstNightReminder": "Show the Lamplighter a lamp.",
+    "otherNightReminder": "Show the Lamplighter a lamp again.",
+    "flavor": "Light keeps the dark honest."
+  },
+  {
+    "id": "bellringer",
+    "name": "Bellringer",
+    "team": "townsfolk",
+    "edition": "gw",
+    "ability": "Each night except the first, ring a bell. If anyone is drunk, it rings twice.",
+    "setup": false,
+    "reminders": [],
+    "otherNightReminder": "The Bellringer rings a bell.",
+    "flavor": "Twice is a warning."
+  },
+  {
+    "id": "ferryman",
+    "name": "Ferryman",
+    "team": "outsider",
+    "edition": "gw",
+    "ability": "You start the game drunk.",
+    "setup": true,
+    "reminders": ["Drunk"],
+    "flavor": "Mind the current."
+  },
+  {
+    "id": "whisperer",
+    "name": "Whisperer",
+    "team": "minion",
+    "edition": "gw",
+    "ability": "On your first night, whisper to one player.",
+    "setup": false,
+    "reminders": ["Whispered"],
+    "firstNightReminder": "The Whisperer points at a player.",
+    "flavor": "Hush."
+  },
+  {
+    "id": "hollowking",
+    "name": "Hollow King",
+    "team": "demon",
+    "edition": "gw",
+    "ability": "Each night except the first, choose a player: they die.",
+    "setup": false,
+    "reminders": ["Dead"],
+    "otherNightReminder": "The Hollow King points at a player. That player dies.",
+    "flavor": "The crown is empty."
+  },
+  {
+    "id": "cartographer",
+    "name": "Cartographer",
+    "team": "traveller",
+    "edition": "gx",
+    "ability": "Once per game, draw a map.",
+    "setup": false,
+    "reminders": [],
+    "flavor": "Here be dragons."
+  }
+]

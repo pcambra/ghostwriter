@@ -1,0 +1,20 @@
+[
+  {
+    "id": "whisperer",
+    "jinx": [
+      {"id": "lamplighter", "reason": "If the Whisperer whispers to the Lamplighter, the lamp goes out."}
+    ]
+  },
+  {
+    "id": "lamplighter",
+    "jinx": [
+      {"id": "whisperer", "reason": "If the Whisperer whispers to the Lamplighter, the lamp goes out."}
+    ]
+  },
+  {
+    "id": "hollowking",
+    "jinx": [
+      {"id": "ferryman", "reason": "The Ferryman cannot carry the Hollow King."}
+    ]
+  }
+]

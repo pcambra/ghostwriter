@@ -1,0 +1,33 @@
+ghostwriter.settings:
+  type: config_object
+  label: 'Ghostwriter settings'
+  mapping:
+    base_url:
+      type: uri
+      label: 'Base URL of the official data files'
+    stale_after_days:
+      type: integer
+      label: 'Warn when the data is older than this many days'
+
+ghostwriter.script.*:
+  type: config_entity
+  label: 'Script'
+  mapping:
+    id:
+      type: machine_name
+      label: 'Machine name'
+    label:
+      type: required_label
+      label: 'Name'
+    author:
+      type: string
+      label: 'Author'
+    characters:
+      type: sequence
+      label: 'Character ids'
+      sequence:
+        type: string
+        label: 'Character id'
+    meta:
+      type: ignore
+      label: 'Script _meta entry'

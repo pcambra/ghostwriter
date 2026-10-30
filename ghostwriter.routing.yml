@@ -1,0 +1,7 @@
+ghostwriter.refresh:
+  path: '/admin/config/services/ghostwriter'
+  defaults:
+    _form: '\Drupal\ghostwriter\Form\RefreshForm'
+    _title: 'Ghostwriter data'
+  requirements:
+    _permission: 'administer ghostwriter'

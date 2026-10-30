@@ -1,0 +1,4 @@
+administer ghostwriter:
+  title: 'Administer Ghostwriter'
+  description: 'Re-download the official Blood on the Clocktower data files, and save, replace or delete scripts.'
+  restrict access: true

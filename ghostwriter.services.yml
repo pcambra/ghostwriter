@@ -1,0 +1,12 @@
+services:
+  _defaults:
+    autowire: true
+  logger.channel.ghostwriter:
+    parent: logger.channel_base
+    arguments: ['ghostwriter']
+  Drupal\ghostwriter\Sync\DataSync: ~
+  ghostwriter.sync: '@Drupal\ghostwriter\Sync\DataSync'
+  Drupal\ghostwriter\Data\CharacterRepository: ~
+  ghostwriter.characters: '@Drupal\ghostwriter\Data\CharacterRepository'
+  Drupal\ghostwriter\Data\ScriptImporter: ~
+  ghostwriter.script_importer: '@Drupal\ghostwriter\Data\ScriptImporter'
