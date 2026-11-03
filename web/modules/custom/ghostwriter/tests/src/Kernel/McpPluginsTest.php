@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Drupal\Tests\ghostwriter\Kernel;
 
 use Drupal\Tests\user\Traits\UserCreationTrait;
+use Drupal\consumers\Entity\Consumer;
+use Drupal\ghostwriter\Hook\GhostwriterHooks;
 use Drupal\ghostwriter\Plugin\mcp_server\ResourceProvider\GhostwriterStatus;
 use Drupal\ghostwriter\Sync\DataSync;
 use GuzzleHttp\Client;
@@ -27,6 +29,23 @@ final class McpPluginsTest extends GhostwriterKernelTestBase {
   use UserCreationTrait;
 
   /**
+   * {@inheritdoc}
+   */
+  protected static $modules = [
+    'system',
+    'user',
+    'mcp_server',
+    'ghostwriter',
+    'consumers',
+    'file',
+    'image',
+    'options',
+    'serialization',
+    'simple_oauth',
+    'simple_oauth_server_metadata',
+  ];
+
+  /**
    * Only administer ghostwriter unlocks the tools that write.
    */
   public function testWriteToolsNeedAdminPermission(): void {
@@ -41,6 +60,17 @@ final class McpPluginsTest extends GhostwriterKernelTestBase {
       $this->assertFalse($tool->checkAccess($user)->isAllowed(), $id);
       $this->assertTrue($tool->checkAccess($admin)->isAllowed(), $id);
     }
+  }
+
+  /**
+   * Clients that register with no scope get the mcp scope.
+   */
+  public function testNewConsumerGetsMcpScope(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('consumer');
+    $consumer = Consumer::create(['label' => 'Self-registered client']);
+    $consumer->save();
+    $this->assertSame([['scope_id' => GhostwriterHooks::OAUTH_SCOPE]], $consumer->get('authorization_code_scopes')->getValue());
   }
 
   /**

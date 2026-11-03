@@ -44,8 +44,9 @@ either replaces all three validated files or keeps the previous ones.
 ## Install
 
 This repository is the whole Drupal site: core 11.4, PHP 8.5, Drush 13,
-`drupal/mcp_server` 2.0 (beta), and the module in
-`web/modules/custom/ghostwriter`. It needs [DDEV](https://ddev.com).
+`drupal/mcp_server` 2.0 (beta), `drupal/mcp_server_oauth` 1.0 (alpha), and
+the module in `web/modules/custom/ghostwriter`. It runs on SQLite, locally and
+in production, and needs [DDEV](https://ddev.com).
 
 ```
 git clone https://github.com/pcambra/ghostwriter.git
@@ -53,12 +54,28 @@ cd ghostwriter
 ddev start
 ddev composer install
 ddev restart
-echo "\$settings['file_private_path'] = '../private';" >> web/sites/default/settings.php
-ddev drush site:install minimal --account-name=admin -y
-ddev drush en ghostwriter -y
+mkdir db keys
+cat >> web/sites/default/settings.php <<'PHP'
+$settings['file_private_path'] = '../private';
+$settings['config_sync_directory'] = '../config/sync';
+$databases['default']['default'] = [
+  'database' => '../db/ghostwriter.sqlite',
+  'prefix' => '',
+  'driver' => 'sqlite',
+  'namespace' => 'Drupal\\sqlite\\Driver\\Database\\sqlite',
+  'autoload' => 'core/modules/sqlite/src/Driver/Database/sqlite/',
+];
+PHP
+ddev drush site:install --existing-config --account-name=admin -y
+ddev drush simple-oauth:generate-keys /var/www/html/keys
 ```
 
-`drush en ghostwriter` enables `mcp_server` too and downloads the data.
+The site installs from the exported configuration in `config/sync` and
+downloads the data. The database lives in `db/` and the OAuth signing keys in
+`keys/`, both outside the web root and out of git.
+
+Configuration changes are made on the local site, exported with
+`ddev drush config:export`, and committed.
 
 ## Connect a client
 
@@ -72,9 +89,15 @@ Check it with the MCP Inspector:
 npx @modelcontextprotocol/inspector --cli ddev drush mcp:server admin --method tools/list
 ```
 
-The HTTP endpoint `/mcp` only accepts a browser session cookie. Node-based
-clients also need `NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"` to
-trust DDEV's certificate.
+Over HTTP, `/mcp` needs a Drupal account. Connectors such as Claude's and
+ChatGPT's register themselves and send the user to the site's login page
+(OAuth 2.1 through `mcp_server_oauth` and Simple OAuth), so leave their client
+ID and secret empty. Tokens carry the `mcp` scope, which limits them to
+`access mcp server`, except for user 1: its tokens keep every permission on
+every route, so never sign a connector in as user 1. Accounts are created by
+an administrator (`drush user:create`). Node-based clients also need
+`NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"` to trust DDEV's
+certificate.
 
 Composer applies the fix proposed in
 [mcp_server #3585961](https://git.drupalcode.org/project/mcp_server/-/work_items/3585961)
@@ -103,16 +126,19 @@ replaces that script. Every character must be an official id.
 Kernel tests use synthetic fixtures, never official data:
 
 ```
-ddev exec -- env SIMPLETEST_DB=mysql://db:db@db/db vendor/bin/phpunit -c web/core/phpunit.xml.dist web/modules/custom/ghostwriter/tests
+ddev exec -- env SIMPLETEST_DB=sqlite://localhost//tmp/test.sqlite vendor/bin/phpunit -c web/core/phpunit.xml.dist web/modules/custom/ghostwriter/tests
 ```
 
 ## Deploy
 
 A push to `main` runs `.github/workflows/deploy.yml`. It uploads
-`composer.json`, `composer.lock`, `patches/`, `recipes/` and
-`web/modules/custom` to the Compute Engine VM over SSH, then runs
-`composer install --no-dev`, `drush updatedb` and `drush cache:rebuild` there.
-It needs the repository secrets `SSH_PRIVATE_KEY` and `SSH_KNOWN_HOSTS`.
+`composer.json`, `composer.lock`, `patches.lock.json`, `patches/`, `recipes/`,
+`config/` and `web/modules/custom` to the Compute Engine VM over SSH, then
+runs `composer install --no-dev` and `drush deploy` (database updates,
+configuration import, cache rebuild) there. It needs the repository secrets
+`SSH_PRIVATE_KEY` and `SSH_KNOWN_HOSTS`. The server's `settings.php` sets
+`config_sync_directory` to `../config/sync`, and its signing keys are created
+once on the server with `drush simple-oauth:generate-keys`.
 
 ## License
 

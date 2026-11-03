@@ -22,6 +22,7 @@
         "drupal/core-recipe-unpack": "^11.4",
         "drupal/core-recommended": "^11.4",
         "drupal/mcp_server": "^2.0@beta",
+        "drupal/mcp_server_oauth": "^1.0@alpha",
         "drush/drush": "^13"
     },
     "conflict": {

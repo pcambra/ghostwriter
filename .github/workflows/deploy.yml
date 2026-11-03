@@ -29,7 +29,7 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Upload site and custom modules
-        run: rsync -azR --delete composer.json composer.lock patches.lock.json patches recipes web/modules/custom "$TARGET:ghostwriter/"
+        run: rsync -azR --delete composer.json composer.lock patches.lock.json patches recipes config web/modules/custom "$TARGET:ghostwriter/"
 
       - name: Update Drupal
-        run: ssh "$TARGET" 'cd ~/ghostwriter && composer install --no-dev --no-interaction && vendor/bin/drush updatedb -y && vendor/bin/drush cache:rebuild'
+        run: ssh "$TARGET" 'cd ~/ghostwriter && composer install --no-dev --no-interaction && vendor/bin/drush deploy -y'

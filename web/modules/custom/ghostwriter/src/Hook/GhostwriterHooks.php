@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\ghostwriter\Hook;
 
+use Drupal\consumers\Entity\ConsumerInterface;
 use Drupal\Core\Extension\Requirement\RequirementSeverity;
 use Drupal\Core\Hook\Attribute\Hook;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -23,6 +24,8 @@ final class GhostwriterHooks {
     Blood on the Clocktower is a trademark of Steven Medway and The Pandemonium Institute.
     Community Created Content: not affiliated with or endorsed by The Pandemonium Institute.
     TEXT;
+
+  public const OAUTH_SCOPE = 'mcp';
 
   public function __construct(
     private readonly CharacterRepository $characters,
@@ -60,6 +63,21 @@ final class GhostwriterHooks {
   #[Hook('mcp_server_instructions_alter')]
   public function mcpServerInstructionsAlter(?string &$instructions): void {
     $instructions = trim($instructions . "\n\n" . self::INSTRUCTIONS);
+  }
+
+  /**
+   * Implements hook_ENTITY_TYPE_presave() for consumer.
+   *
+   * MCP clients register themselves and ask for no scope, and a token without
+   * a scope grants no permission, so new clients default to the mcp scope.
+   * Simple OAuth adds the scope field; Consumers saves its default consumer
+   * before that field exists.
+   */
+  #[Hook('consumer_presave')]
+  public function consumerPresave(ConsumerInterface $consumer): void {
+    if ($consumer->isNew() && $consumer->hasField('authorization_code_scopes') && $consumer->get('authorization_code_scopes')->isEmpty()) {
+      $consumer->set('authorization_code_scopes', self::OAUTH_SCOPE);
+    }
   }
 
 }

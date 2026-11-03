@@ -9,3 +9,5 @@
 /.editorconfig
 /.gitattributes
 /SPEC.md
+/keys/
+/db/

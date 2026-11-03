@@ -1,0 +1,19 @@
+uuid: 0033345f-14bc-4b4d-9f31-bef9bbc4928b
+langcode: en
+status: true
+dependencies: {  }
+id: mcp
+name: mcp
+description: 'Use Ghostwriter over MCP.'
+grant_types:
+  authorization_code:
+    status: true
+    description: 'Use Ghostwriter over MCP.'
+  refresh_token:
+    status: true
+    description: 'Use Ghostwriter over MCP.'
+umbrella: false
+parent: null
+granularity_id: permission
+granularity_configuration:
+  permission: 'access mcp server'

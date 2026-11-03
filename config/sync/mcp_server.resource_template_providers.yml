@@ -1,0 +1,5 @@
+plugins:
+  -
+    id: ghostwriter_resources
+    enabled: true
+    configuration: {  }
