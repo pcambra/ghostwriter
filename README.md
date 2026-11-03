@@ -94,9 +94,8 @@ ChatGPT's register themselves and send the user to the site's login page
 (OAuth 2.1 through `mcp_server_oauth` and Simple OAuth), so leave their client
 ID and secret empty. Tokens carry the `mcp` scope, which limits them to
 `access mcp server`, except for user 1: its tokens keep every permission on
-every route, so never sign a connector in as user 1. Accounts are created by
-an administrator (`drush user:create`). Node-based clients also need
-`NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"` to trust DDEV's
+every route, so never sign a connector in as user 1. Node-based clients also
+need `NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"` to trust DDEV's
 certificate.
 
 Composer applies the fix proposed in
@@ -105,6 +104,21 @@ from `patches/mcp_server/`. Without it, a running `drush mcp:server` keeps
 Drupal's in-memory caches between requests, so after a refresh or script
 import made elsewhere it answers from the old data until the client
 reconnects.
+
+## Accounts
+
+Visitors cannot register. An administrator creates each account, then sends
+the person the one-time link the second command prints, where they set their
+password:
+
+```
+drush user:create USERNAME --mail=ADDRESS
+drush user:login --name=USERNAME --uri=https://SITE
+```
+
+`drush user:login` takes the account through `--name`, `--mail` or `--uid`:
+its first argument is the path to land on, not a username. People log in with
+their username, not their email address.
 
 ## Keep the data fresh
 
