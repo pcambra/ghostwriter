@@ -2,7 +2,7 @@ _core:
   default_config_hash: HlN7eAN2N4JIHsYv56V4E7sqC9bS609KwvGFjyD_mgk
 langcode: en
 uuid: 61ed8818-ebb4-4de4-9627-f96898daca81
-name: 'Drush Site-Install'
+name: Ghostwriter
 mail: admin@example.com
 slogan: ''
 page:
