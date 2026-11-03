@@ -29,4 +29,5 @@ module:
   minimal: 1000
 theme:
   stark: 0
+  olivero: 0
 profile: minimal
