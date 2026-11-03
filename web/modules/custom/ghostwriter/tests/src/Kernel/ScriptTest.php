@@ -58,6 +58,8 @@ final class ScriptTest extends GhostwriterKernelTestBase {
     $this->assertSame('unknown_character', $importer->import(['lamplighter', 'nobody'], 'bad')['error']['code']);
     $this->assertSame('invalid_script', $importer->import(['lamplighter'])['error']['code']);
     $this->assertSame('invalid_script', $importer->import(['id' => 'bad'])['error']['code']);
+    $this->assertSame('invalid_script', $importer->import(['_meta', 'lamplighter'], 'bad')['error']['code']);
+    $this->assertSame('invalid_script', $repository->resolveSet(['script' => ['_meta', 'lamplighter']])['error']['code']);
     $both = $repository->resolveSet(['script_id' => 'gloom_wood', 'characters' => ['lamplighter']]);
     $this->assertSame('invalid_script', $both['error']['code']);
 

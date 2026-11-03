@@ -197,6 +197,14 @@ final class CharacterRepository {
           ],
         ];
       }
+      if ($id === '_meta' && !is_array($entry)) {
+        return [
+          'error' => [
+            'code' => 'invalid_script',
+            'message' => 'The _meta entry must be an object.',
+          ],
+        ];
+      }
       if ($id === '_meta') {
         $meta = $entry;
       }
