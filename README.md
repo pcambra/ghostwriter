@@ -43,27 +43,28 @@ either replaces all three validated files or keeps the previous ones.
 
 ## Install
 
-Requires Drupal 11.3+, PHP 8.3+, Drush 13, `drupal/mcp_server` 2.0 (beta)
-and a private file path.
+This repository is the whole Drupal site: core 11.4, PHP 8.5, Drush 13,
+`drupal/mcp_server` 2.0 (beta), and the module in
+`web/modules/custom/ghostwriter`. It needs [DDEV](https://ddev.com).
 
-1. In `settings.php`: `$settings['file_private_path'] = '../private';`
-2. Add this repository and require the module:
+```
+git clone https://github.com/pcambra/ghostwriter.git
+cd ghostwriter
+ddev start
+ddev composer install
+ddev restart
+echo "\$settings['file_private_path'] = '../private';" >> web/sites/default/settings.php
+ddev drush site:install minimal --account-name=admin -y
+ddev drush en ghostwriter -y
+```
 
-   ```
-   composer config repositories.ghostwriter vcs https://github.com/pcambra/ghostwriter
-   composer require 'drupal/mcp_server:^2.0@beta' 'pcambra/ghostwriter:dev-main'
-   ```
-
-3. `drush en ghostwriter` enables `mcp_server` too and downloads the data.
+`drush en ghostwriter` enables `mcp_server` too and downloads the data.
 
 ## Connect a client
 
 Clients connect over STDIO through Drush, as a Drupal account (here `admin`).
-With DDEV, from the project root:
-
-```
-claude mcp add -s project ghostwriter -- ddev drush mcp:server admin
-```
+The repository's `.mcp.json` already registers `ddev drush mcp:server admin`
+as `ghostwriter` for Claude Code opened at the project root.
 
 Check it with the MCP Inspector:
 
@@ -75,11 +76,12 @@ The HTTP endpoint `/mcp` only accepts a browser session cookie. Node-based
 clients also need `NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"` to
 trust DDEV's certificate.
 
-A running `drush mcp:server` keeps Drupal's in-memory caches between
-requests, so after a refresh or script import made elsewhere it can answer
-from the old data until the client reconnects. The fix is proposed in
-[mcp_server #3585961](https://git.drupalcode.org/project/mcp_server/-/work_items/3585961);
-apply its patch or reconnect after a refresh.
+Composer applies the fix proposed in
+[mcp_server #3585961](https://git.drupalcode.org/project/mcp_server/-/work_items/3585961)
+from `patches/mcp_server/`. Without it, a running `drush mcp:server` keeps
+Drupal's in-memory caches between requests, so after a refresh or script
+import made elsewhere it answers from the old data until the client
+reconnects.
 
 ## Keep the data fresh
 
@@ -103,6 +105,14 @@ Kernel tests use synthetic fixtures, never official data:
 ```
 ddev exec -- env SIMPLETEST_DB=mysql://db:db@db/db vendor/bin/phpunit -c web/core/phpunit.xml.dist web/modules/custom/ghostwriter/tests
 ```
+
+## Deploy
+
+A push to `main` runs `.github/workflows/deploy.yml`. It uploads
+`composer.json`, `composer.lock`, `patches/`, `recipes/` and
+`web/modules/custom` to the Compute Engine VM over SSH, then runs
+`composer install --no-dev`, `drush updatedb` and `drush cache:rebuild` there.
+It needs the repository secrets `SSH_PRIVATE_KEY` and `SSH_KNOWN_HOSTS`.
 
 ## License
 
