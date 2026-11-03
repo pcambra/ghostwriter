@@ -1,0 +1,17 @@
+{
+    "_hash": "232d3b15136ea71389b7ab1a874115e248ab6134328ec72e2452a03518246917",
+    "patches": {
+        "drupal/mcp_server": [
+            {
+                "package": "drupal/mcp_server",
+                "description": "#3585961 Reset request memory before each stdio message",
+                "url": "patches/mcp_server/3585961-stdio-request-scope.patch",
+                "sha256": "e957d80e45bb9320ebdb8a252ef45cd7ce49052a9760cd164bb37fbb7b9b608e",
+                "depth": 1,
+                "extra": {
+                    "provenance": "root"
+                }
+            }
+        ]
+    }
+}

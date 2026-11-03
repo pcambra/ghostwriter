@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: No empty patches
+        run: test -z "$(find patches -type f -empty)"
+
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -25,8 +28,8 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
-      - name: Upload module
-        run: rsync -az --delete --exclude=.git --exclude=.github ./ "$TARGET:ghostwriter/web/modules/custom/ghostwriter/"
+      - name: Upload site and custom modules
+        run: rsync -azR --delete composer.json composer.lock patches.lock.json patches recipes web/modules/custom "$TARGET:ghostwriter/"
 
       - name: Update Drupal
-        run: ssh "$TARGET" 'cd ~/ghostwriter && vendor/bin/drush updatedb -y && vendor/bin/drush cache:rebuild'
+        run: ssh "$TARGET" 'cd ~/ghostwriter && composer install --no-dev --no-interaction && vendor/bin/drush updatedb -y && vendor/bin/drush cache:rebuild'

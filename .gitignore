@@ -1,0 +1,11 @@
+/vendor/
+/web/*
+!/web/modules/
+/web/modules/*
+!/web/modules/custom/
+/private/
+/.remember/
+/.claude/settings.local.json
+/.editorconfig
+/.gitattributes
+/SPEC.md

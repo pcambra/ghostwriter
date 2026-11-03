@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "ghostwriter": {
+      "type": "stdio",
+      "command": "ddev",
+      "args": [
+        "drush",
+        "mcp:server",
+        "admin"
+      ],
+      "env": {}
+    }
+  }
+}

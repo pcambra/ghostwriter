@@ -1,0 +1,8 @@
+name: Ghostwriter
+description: Unofficial Blood on the Clocktower Storyteller knowledge base served over MCP. Community-created, not affiliated with The Pandemonium Institute.
+type: MCP
+recipes:
+  - core/recipes/administrator_role
+install:
+  - mcp_server
+  - ghostwriter

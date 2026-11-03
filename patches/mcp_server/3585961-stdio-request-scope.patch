@@ -1,0 +1,386 @@
+diff --git a/README.md b/README.md
+index 8ce17c4..7898a4a 100644
+--- a/README.md
++++ b/README.md
+@@ -103,6 +103,29 @@ Add to your MCP client configuration (e.g., `~/Library/Application Support/Claud
+ }
+ ```
+ 
++#### Long-running Sessions
++
++An MCP client keeps one `drush mcp:server` process alive for the whole session. Before each message, the server resets that process to the state a new web request starts in:
++
++- Services tagged `needs_destruction` are destructed, as at the end of a web request.
++- In-memory copies of state, config, cache tag checksums, cache collectors and memory cache bins are dropped, including loaded entities.
++- Plugin managers reload their definitions from the discovery cache, so plugins rebuilt by a `drush cr` elsewhere show up. Entity type definitions are not reloaded.
++- `drupal_static()` is reset and the request time moves to now.
++
++Writes made by other processes, such as the admin UI, Drush or cron, therefore show up on the next message.
++
++A service that keeps its own data in memory can opt in: tag it `mcp_server.request_scoped` and implement `Symfony\Contracts\Service\ResetInterface`. Its `reset()` method then runs before each message.
++
++```yaml
++services:
++  my_module.lookup:
++    class: Drupal\my_module\Lookup
++    tags:
++      - { name: mcp_server.request_scoped }
++```
++
++The container, entity type definitions, path alias lookups, tool access and the tool, resource and prompt lists are still fixed when the process starts. Restart the process after installing modules, changing code, or changing permissions or MCP configuration.
++
+ #### Manual Testing
+ 
+ You can test the STDIO server manually:
+diff --git a/mcp_server.services.yml b/mcp_server.services.yml
+index 08d6ea5..589dc92 100644
+--- a/mcp_server.services.yml
++++ b/mcp_server.services.yml
+@@ -65,6 +65,16 @@ services:
+       - '@module_handler'
+       - '@private_key'
+ 
++  mcp_server.stdio_request_scope:
++    class: Drupal\mcp_server\Transport\StdioRequestScope
++    arguments:
++      - '@service_container'
++      - '@request_stack'
++      - '@datetime.time'
++      - '%kernel.destructable_services%'
++    tags:
++      - { name: service_id_collector, tag: mcp_server.request_scoped }
++
+   # MCP Server.
+   # The main server instance created by the factory.
+   # Set to not shared so it's recreated for each request with current user context.
+diff --git a/src/Drush/Commands/McpServerCommands.php b/src/Drush/Commands/McpServerCommands.php
+index ec487e3..896ca3a 100644
+--- a/src/Drush/Commands/McpServerCommands.php
++++ b/src/Drush/Commands/McpServerCommands.php
+@@ -10,13 +10,16 @@ use Drupal\Core\Session\AccountInterface;
+ use Drupal\Core\Session\AccountSwitcherInterface;
+ use Drupal\Core\Session\AnonymousUserSession;
+ use Drupal\mcp_server\McpServerFactory;
++use Drupal\mcp_server\Transport\StdioRequestScope;
+ use Drupal\user\UserInterface;
+ use Drush\Attributes as CLI;
+ use Drush\Commands\AutowireTrait;
+ use Drush\Commands\DrushCommands;
++use Mcp\Event\RequestEvent;
+ use Mcp\Server\Transport\StdioTransport;
+ use Symfony\Component\Console\Input\InputInterface;
+ use Symfony\Component\DependencyInjection\Attribute\Autowire;
++use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+ 
+ /**
+  * Drush commands for MCP Server.
+@@ -45,6 +48,10 @@ class McpServerCommands extends DrushCommands {
+     private readonly AccountSwitcherInterface $accountSwitcher,
+     #[Autowire(service: 'entity_type.manager')]
+     private readonly EntityTypeManagerInterface $entityTypeManager,
++    #[Autowire(service: 'event_dispatcher')]
++    private readonly EventDispatcherInterface $eventDispatcher,
++    #[Autowire(service: 'mcp_server.stdio_request_scope')]
++    private readonly StdioRequestScope $requestScope,
+   ) {
+     parent::__construct();
+   }
+@@ -85,6 +92,7 @@ class McpServerCommands extends DrushCommands {
+         'uid' => $user->id(),
+         'account' => $user->getAccountName(),
+       ]);
++      $this->eventDispatcher->addListener(RequestEvent::class, $this->requestScope->restart(...));
+       $this->serverFactory->create()->run($this->createTransport());
+       $this->logger()?->info('MCP server stopped.');
+     }
+diff --git a/src/Transport/StdioRequestScope.php b/src/Transport/StdioRequestScope.php
+new file mode 100644
+index 0000000..7c5925c
+--- /dev/null
++++ b/src/Transport/StdioRequestScope.php
+@@ -0,0 +1,128 @@
++<?php
++
++declare(strict_types=1);
++
++namespace Drupal\mcp_server\Transport;
++
++use Drupal\Component\Datetime\TimeInterface;
++use Drupal\Component\DependencyInjection\ContainerInterface;
++use Drupal\Component\Plugin\Discovery\CachedDiscoveryInterface;
++use Drupal\Core\Cache\CacheCollectorInterface;
++use Drupal\Core\Cache\CacheTagsChecksumInterface;
++use Drupal\Core\Cache\ChainedFastBackend;
++use Drupal\Core\Cache\MemoryBackend;
++use Drupal\Core\Config\CachedStorage;
++use Drupal\Core\Config\ConfigFactoryInterface;
++use Drupal\Core\Entity\EntityTypeManagerInterface;
++use Symfony\Component\HttpFoundation\RequestStack;
++use Symfony\Contracts\Service\ResetInterface;
++
++/**
++ * Gives each STDIO message the fresh memory and clock of a new web request.
++ *
++ * Services that keep other memory opt in with the mcp_server.request_scoped
++ * tag and Symfony's ResetInterface.
++ */
++final class StdioRequestScope {
++
++  /**
++   * Constructs the request scope.
++   *
++   * @param \Drupal\Component\DependencyInjection\ContainerInterface $container
++   *   The container whose instantiated services are reset.
++   * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
++   *   The request stack holding the request time.
++   * @param \Drupal\Component\Datetime\TimeInterface $time
++   *   The time service.
++   * @param list<string> $destructableServiceIds
++   *   Services core destructs when a request ends.
++   * @param list<string> $taggedServiceIds
++   *   Services tagged mcp_server.request_scoped.
++   */
++  public function __construct(
++    private readonly ContainerInterface $container,
++    private readonly RequestStack $requestStack,
++    private readonly TimeInterface $time,
++    private readonly array $destructableServiceIds,
++    private readonly array $taggedServiceIds,
++  ) {}
++
++  /**
++   * Ends the previous message's request and starts a new one.
++   */
++  public function restart(): void {
++    foreach ($this->initialized($this->destructableServiceIds) as $service) {
++      $service->destruct();
++    }
++    foreach ($this->initialized($this->container->getServiceIds()) as $service) {
++      self::reset($service);
++    }
++    foreach ($this->initialized($this->taggedServiceIds) as $service) {
++      assert($service instanceof ResetInterface);
++      $service->reset();
++    }
++    drupal_static_reset();
++    $server = $this->requestStack->getCurrentRequest()->server;
++    $server->set('REQUEST_TIME', $this->time->getCurrentTime());
++    $server->set('REQUEST_TIME_FLOAT', $this->time->getCurrentMicroTime());
++  }
++
++  /**
++   * Returns the already built services among the ids, once per object.
++   *
++   * @param list<string> $ids
++   *   Service ids.
++   *
++   * @return array<int, object>
++   *   The services, keyed by object id.
++   */
++  private function initialized(array $ids): array {
++    $services = [];
++    foreach (array_filter($ids, $this->container->initialized(...)) as $id) {
++      $service = $this->container->get($id);
++      $services[spl_object_id($service)] = $service;
++    }
++    return $services;
++  }
++
++  /**
++   * Drops what a core service type keeps in memory for the current request.
++   */
++  private static function reset(object $service): void {
++    if ($service instanceof CacheCollectorInterface
++      || $service instanceof CacheTagsChecksumInterface
++      || $service instanceof ChainedFastBackend
++      || $service instanceof ConfigFactoryInterface) {
++      $service->reset();
++    }
++    elseif ($service instanceof MemoryBackend) {
++      $service->deleteAll();
++    }
++    elseif ($service instanceof CachedStorage) {
++      $service->resetListCache();
++    }
++    elseif ($service instanceof CachedDiscoveryInterface && !$service instanceof EntityTypeManagerInterface) {
++      self::reloadDefinitions($service);
++    }
++  }
++
++  /**
++   * Drops a plugin manager's in-memory definitions, keeping its cache entry.
++   *
++   * Plugin managers have no reset-only method. useCaches(FALSE) empties the
++   * in-memory definitions (DefaultPluginManager::useCaches()), and
++   * useCaches(TRUE) turns caching back on. The next getDefinitions() then
++   * reads cache.discovery again, which a drush cr in another process rebuilt.
++   * clearCachedDefinitions() is not used: it also invalidates that cache
++   * entry, so discovery would search every module again on every message.
++   *
++   * entity_type.manager is excluded by the caller: its useCaches(FALSE) also
++   * drops every entity handler (EntityTypeManager::useCaches()), which would
++   * rebuild entity storages on every message.
++   */
++  private static function reloadDefinitions(CachedDiscoveryInterface $manager): void {
++    $manager->useCaches(FALSE);
++    $manager->useCaches(TRUE);
++  }
++
++}
+diff --git a/tests/src/Kernel/Drush/McpServerCommandsTest.php b/tests/src/Kernel/Drush/McpServerCommandsTest.php
+index d2fbbe7..b99f25e 100644
+--- a/tests/src/Kernel/Drush/McpServerCommandsTest.php
++++ b/tests/src/Kernel/Drush/McpServerCommandsTest.php
+@@ -4,6 +4,10 @@ declare(strict_types=1);
+ 
+ namespace Drupal\Tests\mcp_server\Kernel\Drush;
+ 
++use Drupal\Component\Plugin\Discovery\CachedDiscoveryInterface;
++use Drupal\Component\Plugin\Discovery\DiscoveryTrait;
++use Drupal\Core\Cache\DatabaseCacheTagsChecksum;
++use Drupal\Core\DependencyInjection\ContainerBuilder;
+ use Drupal\KernelTests\KernelTestBase;
+ use Drupal\mcp_server\Drush\Commands\McpServerCommands;
+ use Drupal\Tests\user\Traits\UserCreationTrait;
+@@ -19,6 +23,7 @@ use Symfony\Component\Console\Input\ArrayInput;
+ use Symfony\Component\Console\Input\InputArgument;
+ use Symfony\Component\Console\Input\InputDefinition;
+ use Symfony\Component\Console\Output\BufferedOutput;
++use Symfony\Contracts\Service\ResetInterface;
+ 
+ /**
+  * Tests that drush mcp:server runs the STDIO session as the given account.
+@@ -47,6 +52,18 @@ final class McpServerCommandsTest extends KernelTestBase {
+    */
+   private array $logRecords = [];
+ 
++  /**
++   * {@inheritdoc}
++   */
++  public function register(ContainerBuilder $container): void {
++    parent::register($container);
++    $container->register('mcp_server_test.plugin_manager')
++      ->setSynthetic(TRUE);
++    $container->register('mcp_server_test.request_scoped')
++      ->setSynthetic(TRUE)
++      ->addTag('mcp_server.request_scoped');
++  }
++
+   /**
+    * {@inheritdoc}
+    */
+@@ -109,6 +126,91 @@ final class McpServerCommandsTest extends KernelTestBase {
+     $this->assertSame(0, (int) $this->container->get('current_user')->id());
+   }
+ 
++  /**
++   * Each message starts like a new web request.
++   */
++  public function testEachMessageStartsFreshRequest(): void {
++    $this->createUser([], 'editor');
++    $state = $this->container->get('state');
++    $checksum = $this->container->get('cache_tags.invalidator.checksum');
++    $config_factory = $this->container->get('config.factory');
++    $memory = $this->container->get('entity.memory_cache');
++    $state->set('mcp_server_test.value', 'before');
++    $tag_checksum = $checksum->getCurrentChecksum(['mcp_server_test']);
++    $settings = $config_factory->get('mcp_server.settings')->getRawData();
++    $memory->set('mcp_server_test', 'loaded');
++    $this->container->get('request_stack')->getCurrentRequest()->server->set('REQUEST_TIME', 1);
++    $opted_in = new class() implements ResetInterface {
++
++      /**
++       * Whether reset() ran.
++       */
++      public bool $wasReset = FALSE;
++
++      /**
++       * {@inheritdoc}
++       */
++      public function reset(): void {
++        $this->wasReset = TRUE;
++      }
++
++    };
++    $this->container->set('mcp_server_test.request_scoped', $opted_in);
++    $plugin_manager = new class() implements CachedDiscoveryInterface {
++
++      use DiscoveryTrait;
++
++      /**
++       * Arguments of each useCaches() call.
++       *
++       * @var list<bool>
++       */
++      public array $useCaches = [];
++
++      /**
++       * {@inheritdoc}
++       */
++      public function getDefinitions() {
++        return [];
++      }
++
++      /**
++       * {@inheritdoc}
++       */
++      public function clearCachedDefinitions() {
++        throw new \LogicException('Clearing would invalidate the discovery cache.');
++      }
++
++      /**
++       * {@inheritdoc}
++       */
++      public function useCaches($use_caches = FALSE) {
++        $this->useCaches[] = $use_caches;
++      }
++
++    };
++    $this->container->set('mcp_server_test.plugin_manager', $plugin_manager);
++    $user_storage = $this->container->get('entity_type.manager')->getStorage('user');
++
++    $this->container->get('keyvalue')->get('state')->set('mcp_server_test.value', 'after');
++    (new DatabaseCacheTagsChecksum($this->container->get('database')))->invalidateTags(['mcp_server_test']);
++    $this->container->get('config.storage')->write('mcp_server.settings', ['server_name' => 'Renamed'] + $settings);
++    $this->assertSame('before', $state->get('mcp_server_test.value'));
++    $this->assertSame($tag_checksum, $checksum->getCurrentChecksum(['mcp_server_test']));
++    $this->assertSame('Drupal MCP Server', $config_factory->get('mcp_server.settings')->get('server_name'));
++
++    $this->runServer('editor');
++
++    $this->assertSame('after', $state->get('mcp_server_test.value'));
++    $this->assertNotSame($tag_checksum, $checksum->getCurrentChecksum(['mcp_server_test']));
++    $this->assertSame('Renamed', $config_factory->get('mcp_server.settings')->get('server_name'));
++    $this->assertFalse($memory->get('mcp_server_test'));
++    $this->assertGreaterThan(1, $this->container->get('datetime.time')->getRequestTime());
++    $this->assertTrue($opted_in->wasReset);
++    $this->assertSame([[FALSE, TRUE], [FALSE, TRUE]], array_chunk($plugin_manager->useCaches, 2));
++    $this->assertSame($user_storage, $this->container->get('entity_type.manager')->getStorage('user'));
++  }
++
+   /**
+    * The original account is restored when the server throws.
+    */
+@@ -327,6 +429,8 @@ final class McpServerCommandsTest extends KernelTestBase {
+       $this->container->get('mcp_server.server.factory'),
+       $this->container->get('account_switcher'),
+       $this->container->get('entity_type.manager'),
++      $this->container->get('event_dispatcher'),
++      $this->container->get('mcp_server.stdio_request_scope'),
+       $transport,
+       $stdinIsTerminal,
+     ) extends McpServerCommands {
+@@ -338,10 +442,12 @@ final class McpServerCommandsTest extends KernelTestBase {
+         mixed $serverFactory,
+         mixed $accountSwitcher,
+         mixed $entityTypeManager,
++        mixed $eventDispatcher,
++        mixed $requestScope,
+         private readonly StdioTransport|\Throwable|null $transport,
+         private readonly bool $terminal,
+       ) {
+-        parent::__construct($serverFactory, $accountSwitcher, $entityTypeManager);
++        parent::__construct($serverFactory, $accountSwitcher, $entityTypeManager, $eventDispatcher, $requestScope);
+       }
+ 
+       /**

@@ -1,0 +1,21 @@
+{
+    "name": "pcambra/ghostwriter",
+    "description": "Unofficial Blood on the Clocktower Storyteller knowledge base served over MCP. Community-created, not affiliated with The Pandemonium Institute.",
+    "type": "drupal-module",
+    "license": "GPL-2.0-or-later",
+    "homepage": "https://github.com/pcambra/ghostwriter",
+    "authors": [
+        {
+            "name": "Pedro Cambra"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/pcambra/ghostwriter/issues",
+        "source": "https://github.com/pcambra/ghostwriter"
+    },
+    "require": {
+        "php": ">=8.3",
+        "drupal/core": "^11.3",
+        "drupal/mcp_server": "^2.0"
+    }
+}
