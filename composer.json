@@ -54,9 +54,7 @@
                 "[project-root]/recipes/README.txt": false,
                 "[web-root]/README.md": false,
                 "[web-root]/sites/README.txt": false,
-                "[web-root]/modules/README.txt": false,
-                "[web-root]/profiles/README.txt": false,
-                "[web-root]/themes/README.txt": false
+                "[web-root]/modules/README.txt": false
             }
         },
         "installer-paths": {
