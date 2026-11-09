@@ -159,9 +159,9 @@ final class CharacterRepository {
     return [
       'id' => $id,
       'label' => $script->label(),
-      'author' => $script->get('author'),
-      'characters' => $script->get('characters'),
-      'meta' => $script->get('meta'),
+      'author' => $script->get('author')->value ?? '',
+      'characters' => array_column($script->get('characters')->getValue(), 'value'),
+      'meta' => $script->get('meta')->getValue()[0] ?? [],
     ];
   }
 

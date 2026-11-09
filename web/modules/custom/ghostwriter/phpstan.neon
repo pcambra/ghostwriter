@@ -6,4 +6,4 @@ parameters:
 		entityMapping:
 			ghostwriter_script:
 				class: Drupal\ghostwriter\Entity\Script
-				storage: Drupal\Core\Config\Entity\ConfigEntityStorage
+				storage: Drupal\Core\Entity\Sql\SqlContentEntityStorage

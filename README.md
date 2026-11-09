@@ -131,7 +131,8 @@ status report warns when the data is older than `stale_after_days`
 ## Scripts
 
 `drush ghostwriter:script:import path/to/script.json` saves a script from the
-official script tool as config (`ghostwriter.script.<id>`). The id defaults to
+official script tool as a `ghostwriter_script` content entity, so a deploy's
+configuration import leaves saved scripts in place. The id defaults to
 the `_meta` name; pass `--id` to choose it. Saving under an existing id
 replaces that script. Every character must be an official id.
 
@@ -145,7 +146,10 @@ ddev exec -- env SIMPLETEST_DB=sqlite://localhost//tmp/test.sqlite vendor/bin/ph
 
 ## Deploy
 
-A push to `main` runs `.github/workflows/deploy.yml`. It uploads
+A push to `main` runs `.github/workflows/deploy.yml`. Its `test` job runs
+phpcs, PHPStan and the kernel tests, installs the site from the commit the VM
+runs, then runs `drush deploy` on it with the new code. Only if that passes,
+the `deploy` job uploads
 `composer.json`, `composer.lock`, `patches.lock.json`, `patches/`, `recipes/`,
 `config/` and `web/modules/custom` to the Compute Engine VM over SSH, then
 runs `composer install --no-dev` and `drush deploy` (database updates,

@@ -97,7 +97,7 @@ final class GhostwriterResources extends ResourceTemplateProviderBase {
       }
       if ($matches[1] === 'script') {
         $data['characters'] = array_map($this->characters->character(...), $data['characters']);
-        $tags[] = 'config:ghostwriter_script_list';
+        $tags[] = 'ghostwriter_script_list';
       }
     }
     catch (DataMissingException $e) {

@@ -7,6 +7,7 @@
 
 declare(strict_types=1);
 
+use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\ghostwriter\Sync\DataSync;
 
 /**
@@ -39,6 +40,32 @@ function ghostwriter_uninstall(bool $is_syncing): void {
   }
   \Drupal::state()->deleteMultiple($keys);
   \Drupal::service('file_system')->deleteRecursive(DataSync::DIR);
+}
+
+/**
+ * Moves saved scripts from config to content, before config import drops them.
+ */
+function ghostwriter_update_11001(): TranslatableMarkup {
+  $config_factory = \Drupal::configFactory();
+  $names = $config_factory->listAll('ghostwriter.script.');
+  $scripts = array_map(fn(string $name): array => $config_factory->get($name)->getRawData(), $names);
+  $update_manager = \Drupal::entityDefinitionUpdateManager();
+  $update_manager->uninstallEntityType($update_manager->getEntityType('ghostwriter_script'));
+  $update_manager->installEntityType(\Drupal::entityTypeManager()->getDefinition('ghostwriter_script'));
+  $storage = \Drupal::entityTypeManager()->getStorage('ghostwriter_script');
+  foreach ($scripts as $script) {
+    $storage->create([
+      'id' => $script['id'],
+      'label' => $script['label'],
+      'author' => $script['author'],
+      'characters' => $script['characters'],
+      'meta' => $script['meta'] ? [$script['meta']] : [],
+    ])->save();
+  }
+  foreach ($names as $name) {
+    $config_factory->getEditable($name)->delete();
+  }
+  return t('Moved @count saved scripts from config to content.', ['@count' => count($names)]);
 }
 
 /**

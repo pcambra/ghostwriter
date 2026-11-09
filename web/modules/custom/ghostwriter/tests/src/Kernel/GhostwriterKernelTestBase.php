@@ -36,6 +36,7 @@ abstract class GhostwriterKernelTestBase extends KernelTestBase {
     parent::setUp();
     $this->setSetting('file_private_path', $this->container->getParameter('site.path') . '/private');
     $this->installConfig(['ghostwriter']);
+    $this->installEntitySchema('ghostwriter_script');
   }
 
   /**

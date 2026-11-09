@@ -8,7 +8,60 @@ on:
 concurrency: deploy
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: gd, pdo_sqlite
+          coverage: none
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install the site at the commit the VM runs
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          git checkout --quiet "$BEFORE" || git checkout --quiet HEAD^
+          composer install --no-interaction --no-progress
+          cp web/sites/default/default.settings.php web/sites/default/settings.php
+          printf '%s\n' "\$settings['config_sync_directory'] = '../config/sync';" "\$settings['file_private_path'] = '../private';" >> web/sites/default/settings.php
+          mkdir -p db
+          vendor/bin/drush site:install --existing-config --db-url=sqlite://localhost/../db/ci.sqlite -y
+          git checkout --quiet "$GITHUB_SHA"
+
+      - name: Install this commit's dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Coding standards
+        run: vendor/bin/phpcs --standard=Drupal,DrupalPractice --extensions=php,module,install,inc,yml web/modules/custom/ghostwriter
+
+      - name: Static analysis
+        run: vendor/bin/phpstan analyse -c web/modules/custom/ghostwriter/phpstan.neon --no-progress --memory-limit=1G
+
+      - name: Kernel tests
+        run: SIMPLETEST_DB="sqlite://localhost/$RUNNER_TEMP/test.sqlite" vendor/bin/phpunit -c web/core/phpunit.xml.dist web/modules/custom/ghostwriter/tests
+
+      - name: Deploy this commit to that site
+        run: vendor/bin/drush deploy -y
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     env:
       TARGET: pcambra@ghostwriter.cueleb.re

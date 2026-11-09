@@ -8,26 +8,3 @@ ghostwriter.settings:
     stale_after_days:
       type: integer
       label: 'Warn when the data is older than this many days'
-
-ghostwriter.script.*:
-  type: config_entity
-  label: 'Script'
-  mapping:
-    id:
-      type: machine_name
-      label: 'Machine name'
-    label:
-      type: required_label
-      label: 'Name'
-    author:
-      type: string
-      label: 'Author'
-    characters:
-      type: sequence
-      label: 'Character ids'
-      sequence:
-        type: string
-        label: 'Character id'
-    meta:
-      type: ignore
-      label: 'Script _meta entry'

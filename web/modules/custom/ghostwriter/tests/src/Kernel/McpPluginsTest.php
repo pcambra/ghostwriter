@@ -153,7 +153,7 @@ final class McpPluginsTest extends GhostwriterKernelTestBase {
 
     $this->container->get('ghostwriter.script_importer')->import(['lamplighter'], 'one');
     $script = $resources->getResourceContent('ghostwriter://script/one');
-    $this->assertContains('config:ghostwriter_script_list', $script->metadata->getCacheTags());
+    $this->assertContains('ghostwriter_script_list', $script->metadata->getCacheTags());
 
     $this->assertNull($resources->getResourceContent('ghostwriter://character/nobody'));
     $this->assertNull($resources->getResourceContent('ghostwriter://other/lamplighter'));

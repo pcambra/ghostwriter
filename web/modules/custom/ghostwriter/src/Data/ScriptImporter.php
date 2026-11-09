@@ -46,8 +46,17 @@ final class ScriptImporter {
       ->set('label', $name ?? $id)
       ->set('author', is_string($set['meta']['author'] ?? NULL) ? $set['meta']['author'] : '')
       ->set('characters', $set['ids'])
-      ->set('meta', $set['meta'])
-      ->save();
+      ->set('meta', $set['meta'] ? [$set['meta']] : []);
+    $violations = $entity->validate();
+    if ($violations->count()) {
+      return [
+        'error' => [
+          'code' => 'invalid_script',
+          'message' => $violations->get(0)->getPropertyPath() . ': ' . $violations->get(0)->getMessage(),
+        ],
+      ];
+    }
+    $entity->save();
     return ['id' => $id, 'label' => $entity->label(), 'status' => $status, 'characters' => $set['ids']];
   }
 
