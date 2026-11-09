@@ -10,6 +10,9 @@ concurrency: deploy
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -35,9 +38,9 @@ jobs:
 
       - name: Install the site at the commit the VM runs
         env:
-          BEFORE: ${{ github.event.before }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git checkout --quiet "$BEFORE" || git checkout --quiet HEAD^
+          git checkout --quiet "$(gh run list --workflow deploy.yml --status success --limit 1 --json headSha --jq '.[0].headSha')"
           composer install --no-interaction --no-progress
           cp web/sites/default/default.settings.php web/sites/default/settings.php
           printf '%s\n' "\$settings['config_sync_directory'] = '../config/sync';" "\$settings['file_private_path'] = '../private';" >> web/sites/default/settings.php
